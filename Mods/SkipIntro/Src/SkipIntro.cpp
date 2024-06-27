@@ -18,7 +18,9 @@ DEFINE_PLUGIN_DETOUR(SkipIntro, void, OnLoadScene, ZEntitySceneContext* th, ZSce
         Logger::Debug("+ With brick: {}", s_Brick);
 
     if (p_SceneData.m_sceneName == "assembly:/_PRO/Scenes/Frontend/Boot.entity")
-        p_SceneData.m_sceneName = "assembly:/_PRO/Scenes/Frontend/MainMenu.entity";
+    {
+        p_SceneData.m_sceneName = "assembly:/_PRO/Scenes/Missions/Paris/_Scene_FashionShowHit_01.entity";
+    }
 
     return HookResult<void>(HookAction::Continue());
 }
