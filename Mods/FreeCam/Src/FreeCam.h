@@ -24,9 +24,9 @@ private:
     void ToggleFreecam();
     void EnableFreecam();
     void DisableFreecam();
-	void InstantlyKillNpc();
-	void TeleportMainCharacter();
-	bool GetFreeCameraRayCastClosestHitQueryOutput(ZRayQueryOutput& p_RayOutput);
+    void InstantlyKillNpc();
+    void TeleportMainCharacter();
+    bool GetFreeCameraRayCastClosestHitQueryOutput(ZRayQueryOutput& p_RayOutput);
 
 private:
     DECLARE_PLUGIN_DETOUR(FreeCam, bool, ZInputAction_Digital, ZInputAction* th, int a2);
@@ -41,13 +41,13 @@ private:
     ZInputAction m_ToggleFreeCamAction;
     ZInputAction m_FreezeFreeCamActionGc;
     ZInputAction m_FreezeFreeCamActionKb;
-	ZInputAction m_InstantlyKillNpcAction;
-	ZInputAction m_TeleportMainCharacterAction;
+    ZInputAction m_InstantlyKillNpcAction;
+    ZInputAction m_TeleportMainCharacterAction;
     bool m_ControlsVisible;
     bool m_HasToggledFreecamBefore;
-	bool m_EditorStyleFreecam;
+    bool m_EditorStyleFreecam;
     std::unordered_map<std::string, std::string> m_PcControls;
-	std::unordered_map<std::string, std::string> m_PcControlsEditorStyle;
+    std::unordered_map<std::string, std::string> m_PcControlsEditorStyle;
     std::unordered_map<std::string, std::string> m_ControllerControls;
 };
 
