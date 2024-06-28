@@ -22,6 +22,10 @@
 #include "IconsMaterialDesign.h"
 #include <imgui_internal.h>
 
+#include <filesystem>
+#include "../../Shared/json.hpp"
+#include <numbers>
+
 FreeCam::FreeCam() :
     m_FreeCamActive(false),
     m_ShouldToggle(false),
@@ -104,11 +108,96 @@ FreeCam::~FreeCam()
     }
 }
 
+
+// CSGOSimple's pattern scan
+// https://github.com/OneshotGH/CSGOSimple-master/blob/master/CSGOSimple/helpers/utils.cpp
+std::uint8_t* PatternScan(void* module, const char* signature)
+{
+    static auto pattern_to_byte = [](const char* pattern) {
+        auto bytes = std::vector<int>{};
+        auto start = const_cast<char*>(pattern);
+        auto end = const_cast<char*>(pattern) + strlen(pattern);
+
+        for (auto current = start; current < end; ++current) {
+            if (*current == '?') {
+                ++current;
+                if (*current == '?')
+                    ++current;
+                bytes.push_back(-1);
+            }
+            else {
+                bytes.push_back(strtoul(current, &current, 16));
+            }
+        }
+        return bytes;
+        };
+
+    auto dosHeader = (PIMAGE_DOS_HEADER)module;
+    auto ntHeaders = (PIMAGE_NT_HEADERS)((std::uint8_t*)module + dosHeader->e_lfanew);
+
+    auto sizeOfImage = ntHeaders->OptionalHeader.SizeOfImage;
+    auto patternBytes = pattern_to_byte(signature);
+    auto scanBytes = reinterpret_cast<std::uint8_t*>(module);
+
+    auto s = patternBytes.size();
+    auto d = patternBytes.data();
+
+    for (auto i = 0ul; i < sizeOfImage - s; ++i) {
+        bool found = true;
+        for (auto j = 0ul; j < s; ++j) {
+            if (scanBytes[i + j] != d[j] && d[j] != -1) {
+                found = false;
+                break;
+            }
+        }
+        if (found) {
+            return &scanBytes[i];
+        }
+    }
+    return nullptr;
+}
+
+uintptr_t ReadLEA32(uintptr_t Address, size_t offset, size_t lea_size, size_t lea_opcode_size)
+{
+    uintptr_t Address_Result = Address;
+    uintptr_t Patch_Address = 0;
+    int32_t lea_offset = 0;
+    uintptr_t New_Offset = 0;
+    if (Address_Result)
+    {
+        if (offset)
+        {
+            Patch_Address = offset + Address_Result;
+            lea_offset = *(int32_t*)(lea_size + Address_Result);
+            New_Offset = Patch_Address + lea_offset + lea_opcode_size;
+        }
+        else
+        {
+            Patch_Address = Address_Result;
+            lea_offset = *(int32_t*)(lea_size + Address_Result);
+            New_Offset = Patch_Address + lea_offset + lea_opcode_size;
+        }
+        return New_Offset;
+    }
+    return 0;
+}
+
 void FreeCam::Init()
 {
     Hooks::ZInputAction_Digital->AddDetour(this, &FreeCam::ZInputAction_Digital);
     Hooks::ZEntitySceneContext_LoadScene->AddDetour(this, &FreeCam::OnLoadScene);
     Hooks::ZEntitySceneContext_ClearScene->AddDetour(this, &FreeCam::OnClearScene);
+    m_gameBase = GetModuleHandle(NULL);
+    uintptr_t IsIGC_RunningAddr = (uintptr_t)PatternScan(m_gameBase, "ff 0d ? ? ? ? 48 8d 4b e8 48 83 c4 30 5b e9 ? ? ? ?");
+    if (IsIGC_RunningAddr)
+    {
+        int* IsIGC_Running = nullptr;
+        IsIGC_Running = (int*)ReadLEA32(IsIGC_RunningAddr, 0, 2, 6);
+        if (IsIGC_Running)
+        {
+            m_pIGC_Running = IsIGC_Running;
+        }
+    }
 }
 
 void FreeCam::OnEngineInitialized()
@@ -130,6 +219,137 @@ void FreeCam::OnEngineInitialized()
     {
         Logger::Debug("Failed to add bindings.");
     }
+}
+
+float lerp(float a, float b, float t)
+{
+    return a + t * (b - a);
+}
+
+float4 lerp(const float4& a, const float4& b, float t)
+{
+    return { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t), 1.0f };
+}
+
+SMatrix createSMatrixFromEulerAngles(float rotX, float rotY, float rotZ, const float4& trans)
+{
+    float cosX = std::cos(rotX);
+    float sinX = std::sin(rotX);
+    float cosY = std::cos(rotY);
+    float sinY = std::sin(rotY);
+    float cosZ = std::cos(rotZ);
+    float sinZ = std::sin(rotZ);
+
+    float4 XAxis = {
+        cosY * cosZ,
+        cosY * sinZ,
+        -sinY,
+        0.0f
+    };
+
+    float4 YAxis = {
+        sinX * sinY * cosZ - cosX * sinZ,
+        sinX * sinY * sinZ + cosX * cosZ,
+        sinX * cosY,
+        0.0f
+    };
+
+    float4 ZAxis = {
+        cosX * sinY * cosZ + sinX * sinZ,
+        cosX * sinY * sinZ - sinX * cosZ,
+        cosX * cosY,
+        0.0f
+    };
+
+    return { XAxis, YAxis, ZAxis, trans };
+}
+
+SMatrix interpolateQNToRT(const float4& startRot, const float4& endRot, const float4& startTrans, const float4& endTrans, float t)
+{
+    float lerpRotX = lerp(startRot.x, endRot.x, t);
+    float lerpRotY = lerp(startRot.y, endRot.y, t);
+    float lerpRotZ = lerp(startRot.z, endRot.z, t);
+    float4 lerpTrans = lerp(startTrans, endTrans, t);
+
+    return createSMatrixFromEulerAngles(lerpRotX, lerpRotY, lerpRotZ, lerpTrans);
+}
+
+constexpr float invert_c_RAD2DEG = (std::numbers::pi / -180.0f);
+
+void FreeCam::ResetCameraPoints()
+{
+    m_cameraCurrentTime = 0;
+    m_totalDuration = 0;
+    m_segmentStartTime = 0;
+    m_numSegments = -1;
+    m_currentSegment = 0;
+    m_cameraPoints.clear();
+}
+
+void FreeCam::loadCameraPoints(const std::wstring& filename)
+{
+    std::ifstream file(filename);
+    if (!file)
+    {
+        return;
+    }
+    nlohmann::json jsonData;
+    file >> jsonData;
+
+    for (const auto& point : jsonData)
+    {
+        float4 rotation = {
+            point["rotation"]["x"].get<float>() * invert_c_RAD2DEG,
+            point["rotation"]["y"].get<float>() * invert_c_RAD2DEG,
+            point["rotation"]["z"].get<float>() * invert_c_RAD2DEG,
+            0.0f
+        };
+
+        float4 position = {
+            point["position"]["x"].get<float>(),
+            point["position"]["y"].get<float>(),
+            point["position"]["z"].get<float>(),
+            1.0f
+        };
+
+        double duration = point["duration"].get<double>();
+
+        m_cameraPoints.push_back({ rotation, position, duration });
+        m_totalDuration += duration;
+        m_numSegments++;
+    }
+}
+
+void FreeCam::UpdatePoints()
+{
+    if (m_cameraPoints.empty() || m_currentSegment >= m_cameraPoints.size() - 1)
+    {
+        // when complete, clear the list so user can reload it
+        ResetCameraPoints();
+        return;
+    }
+
+    if (m_cameraCurrentTime < m_totalDuration)
+    {
+        const auto& start = m_cameraPoints[m_currentSegment];
+        const auto& end = m_cameraPoints[m_currentSegment + 1];
+        double segmentDuration = start.duration;
+
+        double t = (m_cameraCurrentTime - m_segmentStartTime) / segmentDuration;
+        auto s_Camera = (*Globals::ApplicationEngineWin32)->m_pEngineAppCommon.m_pFreeCamera01;
+        s_Camera.m_pInterfaceRef->SetWorldMatrix(interpolateQNToRT(start.rotation, end.rotation, start.position, end.position, t));
+
+        m_cameraCurrentTime += m_lastFrameUpdate_time;
+
+        if (m_cameraCurrentTime >= m_segmentStartTime + segmentDuration)
+        {
+            m_segmentStartTime += segmentDuration;
+            m_currentSegment++;
+        }
+        return;
+    }
+    // when complete, clear the list so user can reload it
+    ResetCameraPoints();
 }
 
 void FreeCam::OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent)
@@ -164,11 +384,54 @@ void FreeCam::OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent)
         m_ShouldToggle = false;
 
         if (m_FreeCamActive)
+        {
             EnableFreecam();
+            ResetCameraPoints();
+            std::wstring local_path = std::filesystem::current_path();
+            loadCameraPoints(local_path + L"\\data\\camera_points.json");
+        }
         else
+        {
             DisableFreecam();
+            ResetCameraPoints();
+        }
     }
 
+    if (!m_benchmarkStarted)
+    {
+        const auto s_CurrentCamera = Functions::GetCurrentCamera->Call();
+        SMatrix CameraLoc = s_CurrentCamera->GetWorldMatrix();
+        static bool setOnce;
+        if (!setOnce)
+        {
+            if (*m_pIGC_Running == 1)
+            {
+                m_IGC_Started = *m_pIGC_Running;
+                setOnce = true;
+            }
+        }
+        // `m_IGC_Started` must be true to indicate that IGC has started at least once
+        if (m_IGC_Started && *m_pIGC_Running == 0)
+        {
+            ToggleFreecam();
+            m_benchmarkStarted = true;
+
+            {
+                TEntityRef<ZHitman5> s_LocalHitman;
+                Functions::ZPlayerRegistry_GetLocalPlayer->Call(Globals::PlayerRegistry, &s_LocalHitman);
+                // Teleport player to start stage event prior to camera getting there
+                if (s_LocalHitman)
+                {
+                    ZSpatialEntity* s_SpatialEntity = s_LocalHitman.m_ref.QueryInterface<ZSpatialEntity>();
+                    SMatrix s_WorldMatrix = s_SpatialEntity->GetWorldMatrix();
+                    s_WorldMatrix.Trans.x = -192.15279f;
+                    s_WorldMatrix.Trans.y = 22.392776f;
+                    s_WorldMatrix.Trans.z = -1.1392722f;
+                    s_SpatialEntity->SetWorldMatrix(s_WorldMatrix);
+                }
+            }
+        }
+    }
     // While freecam is active, only enable hitman input when the "freeze camera" button is pressed.
     if (m_FreeCamActive)
     {
@@ -203,8 +466,9 @@ void FreeCam::OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent)
             if (s_InputControl)
                 s_InputControl->m_bActive = s_FreezeFreeCam;
         }
+        UpdatePoints();
     }
-    lastFrameUpdate_time = p_UpdateEvent.m_GameTimeDelta.ToSeconds();
+    m_lastFrameUpdate_time = p_UpdateEvent.m_GameTimeDelta.ToSeconds();
 }
 
 void FreeCam::OnDrawMenu()
@@ -361,7 +625,20 @@ void FreeCam::OnDrawUI(bool p_HasFocus)
 
         if (s_ControlsExpanded)
         {
-            ImGui::Text("GetDeltaTime: %lf", lastFrameUpdate_time);
+            ImGui::Text("Last frame update time: %lf", m_lastFrameUpdate_time);
+            ImGui::Text("m_cameraCurrentTime: %lf", m_cameraCurrentTime);
+            ImGui::Text("m_totalDuration: %lf", m_totalDuration);
+            ImGui::Text("m_segmentStartTime: %lf", m_segmentStartTime);
+            ImGui::Text("m_numSegments: %li", m_numSegments);
+            ImGui::Text("m_currentSegment: %li", m_currentSegment);
+            const auto s_CurrentCamera = Functions::GetCurrentCamera->Call();
+            SMatrix CameraLoc = s_CurrentCamera->GetWorldMatrix();
+            ImGui::Text("CameraLoc.XAxis: %f, %f, %f", CameraLoc.XAxis.x, CameraLoc.XAxis.y, CameraLoc.XAxis.z);
+            ImGui::Text("CameraLoc.YAxis: %f, %f, %f", CameraLoc.YAxis.x, CameraLoc.YAxis.y, CameraLoc.YAxis.z);
+            ImGui::Text("CameraLoc.ZAxis: %f, %f, %f", CameraLoc.ZAxis.x, CameraLoc.ZAxis.y, CameraLoc.ZAxis.z);
+            ImGui::Text("CameraLoc.Transform: %f, %f, %f", CameraLoc.Trans.x, CameraLoc.Trans.y, CameraLoc.Trans.z);
+            ImGui::Text("m_benchmarkStarted: %s", m_benchmarkStarted ? "true" : "false");
+            /*
             ImGui::TextUnformatted("PC Controls");
 
             ImGui::BeginTable("FreeCamControlsPc", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit);
@@ -402,6 +679,7 @@ void FreeCam::OnDrawUI(bool p_HasFocus)
 
                 ImGui::EndTable();
             }
+            */
         }
 
         ImGui::PopFont();
