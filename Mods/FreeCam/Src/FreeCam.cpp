@@ -204,6 +204,7 @@ void FreeCam::OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent)
                 s_InputControl->m_bActive = s_FreezeFreeCam;
         }
     }
+    lastFrameUpdate_time = p_UpdateEvent.m_GameTimeDelta.ToSeconds();
 }
 
 void FreeCam::OnDrawMenu()
@@ -360,6 +361,7 @@ void FreeCam::OnDrawUI(bool p_HasFocus)
 
         if (s_ControlsExpanded)
         {
+            ImGui::Text("GetDeltaTime: %lf", lastFrameUpdate_time);
             ImGui::TextUnformatted("PC Controls");
 
             ImGui::BeginTable("FreeCamControlsPc", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit);

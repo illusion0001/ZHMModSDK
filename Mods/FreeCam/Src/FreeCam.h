@@ -49,6 +49,7 @@ private:
     std::unordered_map<std::string, std::string> m_PcControls;
     std::unordered_map<std::string, std::string> m_PcControlsEditorStyle;
     std::unordered_map<std::string, std::string> m_ControllerControls;
+    double lastFrameUpdate_time;
 };
 
 DECLARE_ZHM_PLUGIN(FreeCam)
