@@ -36,7 +36,8 @@ jobs:
         }
     - name: Build and install debug
       run: |
-        cmake --preset x64-Debug .
+        cmake -G "Ninja"  -DCMAKE_INSTALL_PREFIX:STRING="${{ github.workspace }}/_install/x64-Debug" -DCMAKE_CXX_COMPILER:STRING="cl.exe" -DCMAKE_TOOLCHAIN_FILE:FILEPATH="${{ github.workspace }}/External/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_OVERLAY_TRIPLETS:STRING="${{ github.workspace }}/cmake/vcpkg-overlays" -DVCPKG_TARGET_TRIPLET:STRING="x64-windows-zhm" -DVCPKG_HOST_TRIPLET:STRING="x64-windows-zhm" -DCMAKE_VERBOSE_MAKEFILE:BOOL="FALSE" -DCMAKE_POLICY_DEFAULT_CMP0091:STRING="NEW" -DCMAKE_BUILD_TYPE:STRING="Debug" -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING="MultiThreadedDebug" -DCMAKE_MAKE_PROGRAM="ninja" "${{ github.workspace }}"
+        #cmake --preset x64-Debug .
         cmake --build _build/x64-Debug -j12
         cmake --install _build/x64-Debug
 
