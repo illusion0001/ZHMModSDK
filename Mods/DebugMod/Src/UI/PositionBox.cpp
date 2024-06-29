@@ -154,6 +154,26 @@ void DebugMod::DrawPositionBox(bool p_HasFocus)
             ));
         }
 
+        ImGui::TextUnformatted("Camera Position (QN):");
+
+        double s_RotationX, s_RotationY, s_RotationZ;
+        {
+            constexpr double c_RAD2DEG = 180.0 / std::numbers::pi;
+
+            s_RotationX = abs(s_CameraTrans.XAxis.z) < 0.9999999f
+                ? atan2f(-s_CameraTrans.YAxis.z, s_CameraTrans.ZAxis.z) * c_RAD2DEG
+                : atan2f(s_CameraTrans.ZAxis.y, s_CameraTrans.YAxis.y) * c_RAD2DEG;
+
+            s_RotationY = asinf(min(max(-1.f, s_CameraTrans.XAxis.z), 1.f)) * c_RAD2DEG;
+
+            s_RotationZ = abs(s_CameraTrans.XAxis.z) < 0.9999999f
+                ? atan2f(-s_CameraTrans.XAxis.y, s_CameraTrans.XAxis.x) * c_RAD2DEG
+                : 0.f;
+        }
+
+        ImGui::Text("Rotation: x: %lf, y: %lf, z: %lf", s_RotationX, s_RotationY, s_RotationZ);
+        ImGui::Text("Position: x: %f, y: %f, z: %f", s_CameraTrans.Trans.x, s_CameraTrans.Trans.y, s_CameraTrans.Trans.z);
+
         ImGui::Checkbox("Use Snap", &m_UseSnap);
         ImGui::SameLine();
         ImGui::InputFloat3("", m_SnapValue);
