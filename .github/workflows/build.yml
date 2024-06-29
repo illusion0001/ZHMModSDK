@@ -12,22 +12,28 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: [ ptlm-runner ]
+    runs-on: [ windows-latest ]
 
     steps:
     - name: Get latest CMake and ninja
       uses: lukka/get-cmake@latest
 
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@main
       with:
         submodules: recursive
 
     - name: Setup VS environment
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
-
+      run: |
+        $installationPath = vswhere.exe -prerelease -latest -property installationPath
+        if ($installationPath -and (test-path "$installationPath\Common7\Tools\vsdevcmd.bat"))
+        {
+            & "${env:COMSPEC}" /s /c "`"$installationPath\Common7\Tools\vsdevcmd.bat`" -no_logo && set" | foreach-object {
+                $name, $value = $_ -split '=', 2
+                echo "$name=$value" >> ${{ github.env }}
+                # set-content env:\"$name" $value
+            }
+        }
     - name: Build and install debug
       run: |
         cmake --preset x64-Debug .
@@ -81,19 +87,19 @@ jobs:
         Copy-Item LICENSE -Destination _sdk/LICENSE
 
     - name: Archive debug SDK and mods
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@main
       with:
         name: ZHMModSDK-Debug
         path: _dist-debug/*
 
     - name: Archive release SDK and mods
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@main
       with:
         name: ZHMModSDK-Release
         path: _dist-release/*
 
     - name: Archive SDK dev package
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@main
       with:
         name: DevPkg-ZHMModSDK
         path: _sdk/*
