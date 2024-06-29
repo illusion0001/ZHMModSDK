@@ -21,7 +21,7 @@ find_package(ZLIB)
 find_package(simdjson CONFIG)
 find_package(OpenSSL)
 find_package(semver CONFIG)
-CPMAddPackage("gh:ValveSoftware/GameNetworkingSockets@1.4.1")
+#CPMAddPackage("gh:ValveSoftware/GameNetworkingSockets@1.4.1")
 CPMAddPackage("gh:felixguendling/cista@0.14")
 CPMAddPackage("gh:OrfeasZ/ZHMTools@3.4.3")
 #add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ZHMTools" "${VCPKG_BUILD_ROOT}/zhmtools")
@@ -34,20 +34,8 @@ add_subdirectory(DirectInputProxy)
 
 # Mods.
 set(MODS
-	WakingUpNpcs
-	NoPause
 	SkipIntro
-	CertPinBypass
-	MaxPatchLevel
-	DebugMod
-	AdvancedRating
 	FreeCam
-	DiscordRichPresence
-	Editor
-	Clumsy
-	Noclip
-	Hitmen
-	DebugCheckKeyEntityEnabler
 )
 
 foreach(MOD IN LISTS MODS)
