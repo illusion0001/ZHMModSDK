@@ -8,7 +8,7 @@
 #include <Glacier/ZAIGameState.h>
 #include <Glacier/SOnlineEvent.h>
 
-#include "json.hpp"
+#include "../../Shared/json.hpp"
 
 void AdvancedRating::Init()
 {
