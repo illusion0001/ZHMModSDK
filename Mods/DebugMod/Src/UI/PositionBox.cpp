@@ -148,7 +148,11 @@ void DebugMod::DrawPositionBox(bool p_HasFocus)
                 : 0.f;
 
             CopyToClipboard(fmt::format(
-                "{{\"rotation\":{{\"x\":{},\"y\":{},\"z\":{}}},\"position\":{{\"x\":{},\"y\":{},\"z\":{}}}}}",
+                "    {{\n"
+                "        \"rotation\": {{\"x\": {}, \"y\": {}, \"z\": {}}},\n"
+                "        \"position\": {{\"x\": {}, \"y\": {}, \"z\": {}}},\n"
+                "        \"duration\": 1.0\n"
+                "    }},\n",
                 s_RotationX, s_RotationY, s_RotationZ,
                 s_CameraTrans.Trans.x, s_CameraTrans.Trans.y, s_CameraTrans.Trans.z
             ));
