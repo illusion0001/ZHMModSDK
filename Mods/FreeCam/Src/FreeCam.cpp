@@ -320,12 +320,30 @@ void FreeCam::loadCameraPoints(const std::wstring& filename)
     }
 }
 
+void SendInputWrapper(WORD inputKey)
+{
+    INPUT inputs[2]{};
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = inputKey;
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = inputKey;
+    inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput((sizeof(inputs) / sizeof(inputs[0])), inputs, sizeof(INPUT));
+}
+
 void FreeCam::UpdatePoints()
 {
-    if (m_cameraPoints.empty() || m_currentSegment >= m_cameraPoints.size() - 1)
+    if (m_currentSegment >= m_cameraPoints.size() - 1)
     {
         // when complete, clear the list so user can reload it
         ResetCameraPoints();
+
+        // Stop data provider capture
+        if (!m_shouldQuit)
+        {
+            SendInputWrapper(VK_F11);
+            m_shouldQuit = true;
+        }
         return;
     }
 
@@ -415,7 +433,6 @@ void FreeCam::OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent)
         {
             ToggleFreecam();
             m_benchmarkStarted = true;
-
             {
                 TEntityRef<ZHitman5> s_LocalHitman;
                 Functions::ZPlayerRegistry_GetLocalPlayer->Call(Globals::PlayerRegistry, &s_LocalHitman);
@@ -430,6 +447,8 @@ void FreeCam::OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent)
                     s_SpatialEntity->SetWorldMatrix(s_WorldMatrix);
                 }
             }
+            // Start data provider capture
+            SendInputWrapper(VK_F11);
         }
     }
     // While freecam is active, only enable hitman input when the "freeze camera" button is pressed.
@@ -469,6 +488,15 @@ void FreeCam::OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent)
         UpdatePoints();
     }
     m_lastFrameUpdate_time = p_UpdateEvent.m_GameTimeDelta.ToSeconds();
+
+    if (m_shouldQuit)
+    {
+        if (m_shouldQuitTime > 4.0)
+        {
+            exit(0);
+        }
+        m_shouldQuitTime += m_lastFrameUpdate_time;
+    }
 }
 
 void FreeCam::OnDrawMenu()

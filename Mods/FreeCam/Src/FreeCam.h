@@ -67,9 +67,11 @@ private:
     size_t m_numSegments = -1;
     size_t m_currentSegment = 0;
     bool m_benchmarkStarted = 0;
+    bool m_shouldQuit = 0;
     HMODULE m_gameBase = 0;
     int* m_pIGC_Running = nullptr;
     int m_IGC_Started = 0;
+    double m_shouldQuitTime = 0;
 };
 
 DECLARE_ZHM_PLUGIN(FreeCam)
