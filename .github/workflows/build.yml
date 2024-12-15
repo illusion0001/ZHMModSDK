@@ -22,24 +22,11 @@ jobs:
       with:
         arch: x64
 
-    - name: Build and install debug
-      run: |
-        cmake --preset x64-Debug .
-        cmake --build _build/x64-Debug -j12
-        cmake --install _build/x64-Debug
-
     - name: Build and install release
       run: |
         cmake --preset x64-Release .
         cmake --build _build/x64-Release -j12
         cmake --install _build/x64-Release
-
-    - name: Copy debug artifacts
-      run: |
-        mkdir _dist-debug
-        Copy-Item _install/x64-Debug/bin/* -Destination _dist-debug/ -Recurse
-        Copy-Item _install/x64-Debug/licenses -Destination _dist-debug/ -Recurse
-        Copy-Item LICENSE -Destination _dist-debug/LICENSE
 
     - name: Copy release artifacts
       run: |
