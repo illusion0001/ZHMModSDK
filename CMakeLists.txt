@@ -39,14 +39,14 @@ set(MODS
 	SkipIntro
 	CertPinBypass
 	MaxPatchLevel
-	DebugMod
+	#DebugMod
 	AdvancedRating
-	FreeCam
+	#FreeCam
 	DiscordRichPresence
-	Editor
-	Clumsy
-	Noclip
-	Hitmen
+	#Editor
+	#Clumsy
+	#Noclip
+	#Hitmen
 	DebugCheckKeyEntityEnabler
 )
 
